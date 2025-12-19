@@ -206,7 +206,6 @@ export function ReportDialog() {
                                             mode="single"
                                             selected={date}
                                             onSelect={setDate}
-                                            initialFocus
                                         />
                                     </PopoverContent>
                                 </Popover>
@@ -246,12 +245,9 @@ export function ReportDialog() {
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0" align="start">
                                         <Calendar
-                                            initialFocus
                                             mode="range"
-                                            defaultMonth={date?.from}
                                             selected={range}
                                             onSelect={setRange}
-                                            numberOfMonths={2}
                                         />
                                     </PopoverContent>
                                 </Popover>
