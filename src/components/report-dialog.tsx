@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -18,22 +18,57 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
+import { SimpleCalendar as Calendar } from "@/components/ui/simple-calendar";
 import { Label } from "@/components/ui/label";
-import { Download, FileText, Loader2 } from "lucide-react";
-import { format, startOfDay, endOfDay, startOfMonth, endOfMonth } from "date-fns";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+import { Download, FileText, Loader2, CalendarIcon } from "lucide-react";
+import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, setYear, setMonth } from "date-fns";
 import { getTransactionsByDate } from "@/app/actions/transaction";
 import { DateRange } from "react-day-picker";
+import { cn } from "@/lib/utils";
 
 export function ReportDialog() {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [reportType, setReportType] = useState<"date" | "month" | "range">("date");
-    const [date, setDate] = useState<Date | undefined>(new Date());
-    const [range, setRange] = useState<DateRange | undefined>({
-        from: new Date(),
-        to: new Date(),
-    });
+
+    // State for different modes
+    // State for different modes
+    const [date, setDate] = useState<Date | undefined>();
+    const [range, setRange] = useState<DateRange | undefined>();
+
+    // State for Month mode
+    const [currentYear, setCurrentYear] = useState<number>(2024); // Default to avoid hydration mismatch, updated in effect
+    const [selectedYear, setSelectedYear] = useState<string>("");
+    const [selectedMonth, setSelectedMonth] = useState<string>("");
+
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+        setDate(new Date());
+        setRange({
+            from: new Date(),
+            to: new Date(),
+        });
+        const d = new Date();
+        setCurrentYear(d.getFullYear());
+        setSelectedYear(d.getFullYear().toString());
+        setSelectedMonth(d.getMonth().toString());
+    }, []);
+
+    if (!mounted) {
+        return (
+            <Button variant="outline" size="sm">
+                <FileText className="mr-2 h-4 w-4" />
+                Reports
+            </Button>
+        );
+    }
 
     const handleDownload = async () => {
         setLoading(true);
@@ -46,9 +81,10 @@ export function ReportDialog() {
                 startDate = startOfDay(date);
                 endDate = endOfDay(date);
             } else if (reportType === "month") {
-                if (!date) return;
-                startDate = startOfMonth(date);
-                endDate = endOfMonth(date);
+                // Construct date from selected year/month
+                const d = new Date(parseInt(selectedYear), parseInt(selectedMonth));
+                startDate = startOfMonth(d);
+                endDate = endOfMonth(d);
             } else {
                 if (!range?.from || !range?.to) return;
                 startDate = startOfDay(range.from);
@@ -99,6 +135,14 @@ export function ReportDialog() {
         }
     };
 
+    const isDownloadDisabled = () => {
+        if (loading) return true;
+        if (reportType === "date") return !date;
+        if (reportType === "range") return !range?.from || !range?.to;
+        if (reportType === "month") return !selectedYear || !selectedMonth;
+        return false;
+    };
+
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -115,6 +159,7 @@ export function ReportDialog() {
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
+                    {/* Report Type Selection */}
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="type" className="text-right">
                             Type
@@ -138,31 +183,132 @@ export function ReportDialog() {
                         </div>
                     </div>
 
-                    <div className="flex justify-center">
-                        {reportType === "range" ? (
-                            <Calendar
-                                mode="range"
-                                selected={range}
-                                onSelect={setRange}
-                                initialFocus
-                            />
-                        ) : (
-                            <Calendar
-                                mode="single"
-                                selected={date}
-                                onSelect={setDate}
-                                initialFocus
-                            />
-                        )}
-                    </div>
-                    {reportType === "month" && date && (
-                        <p className="text-center text-sm text-muted-foreground">
-                            Report will be generated for {format(date, "MMMM yyyy")}
-                        </p>
+                    {/* Specific Date Mode */}
+                    {reportType === "date" && (
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label className="text-right">Date</Label>
+                            <div className="col-span-3">
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn(
+                                                "w-full justify-start text-left font-normal",
+                                                !date && "text-muted-foreground"
+                                            )}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {date ? format(date, "PPP") : <span>Pick a date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0">
+                                        <Calendar
+                                            mode="single"
+                                            selected={date}
+                                            onSelect={setDate}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Date Range Mode */}
+                    {reportType === "range" && (
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label className="text-right">Range</Label>
+                            <div className="col-span-3">
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            id="date"
+                                            variant={"outline"}
+                                            className={cn(
+                                                "w-full justify-start text-left font-normal",
+                                                !range && "text-muted-foreground"
+                                            )}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {range?.from ? (
+                                                range.to ? (
+                                                    <>
+                                                        {format(range.from, "LLL dd, y")} -{" "}
+                                                        {format(range.to, "LLL dd, y")}
+                                                    </>
+                                                ) : (
+                                                    format(range.from, "LLL dd, y")
+                                                )
+                                            ) : (
+                                                <span>Pick a date range</span>
+                                            )}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar
+                                            initialFocus
+                                            mode="range"
+                                            defaultMonth={date?.from}
+                                            selected={range}
+                                            onSelect={setRange}
+                                            numberOfMonths={2}
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Month Mode */}
+                    {reportType === "month" && (
+                        <>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label className="text-right">Year</Label>
+                                <div className="col-span-3">
+                                    <Select
+                                        value={selectedYear}
+                                        onValueChange={setSelectedYear}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Year" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {Array.from({ length: 10 }, (_, i) => currentYear - i).map(
+                                                (year) => (
+                                                    <SelectItem key={year} value={year.toString()}>
+                                                        {year}
+                                                    </SelectItem>
+                                                )
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label className="text-right">Month</Label>
+                                <div className="col-span-3">
+                                    <Select
+                                        value={selectedMonth}
+                                        onValueChange={setSelectedMonth}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Month" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {Array.from({ length: 12 }, (_, i) => i).map((monthIndex) => (
+                                                <SelectItem key={monthIndex} value={monthIndex.toString()}>
+                                                    {format(new Date(2000, monthIndex, 1), "MMMM")}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                        </>
                     )}
                 </div>
                 <DialogFooter>
-                    <Button onClick={handleDownload} disabled={loading || (reportType === "range" ? (!range?.from || !range?.to) : !date)}>
+                    <Button onClick={handleDownload} disabled={isDownloadDisabled()}>
                         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         <Download className="mr-2 h-4 w-4" />
                         Download CSV
