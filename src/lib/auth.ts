@@ -4,6 +4,11 @@ import bcrypt from "bcryptjs";
 import dbConnect from "@/lib/db";
 import User from "@/models/User";
 
+
+if (!process.env.NEXTAUTH_SECRET) {
+    throw new Error("Please define the NEXTAUTH_SECRET environment variable inside .env.local");
+}
+
 export const authOptions: NextAuthOptions = {
     providers: [
         CredentialsProvider({
