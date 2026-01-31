@@ -1,4 +1,7 @@
 import { getAllTransactions } from "@/app/actions/transaction";
+
+export const dynamic = "force-dynamic";
+
 import { AddTransactionDialog } from "@/components/add-transaction-dialog";
 import { EditTransactionDialog } from "@/components/edit-transaction-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
